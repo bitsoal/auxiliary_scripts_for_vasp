@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
-# Author: yang tong
+# Author: Computational Material Physics (Feng & Zhang)
+# Website: https://2dmaterials.nus.edu.sg/feng/
 # Email: e0001020@u.nus.edu
 
 
@@ -9,21 +10,25 @@
 #             the total (spin-polarized) DOSs of specific atoms in a crystal system
 #             is required.
 #How to use:
+#             Suppose this script is named 'Process_Partial_Dos.py' and the setting file is named 'setting'
+#             command: python Process_Partial_Dos.py setting
+#
 #          1. Use SplitDos.sh to split a DOSCAR into a series of sub-DOS files for each atom with
-#             filenames DOS + the atom index in the POSCAR
-#          2. In order to implement this code, you need to supply a input filename, say setting_file.
-#             In this file, each line is a summation action and the total DOS of the given atoms will be written
-#             into a five filename.
+#             filenames 'DOS + the atom index in the POSCAR', i.e. DOS001, DOS101, ...
+#          2. In order to implement this code, you need to supply a input filename, say setting.
+#             In this file, each line is a individual job. The partial DOS combination or the total DOS
+#             calculation of the given atoms will be implemented and written into a file as per parameters bellow.
 #             Parameters required:
 #                                - ISPIN=1 | 2: whether it is a spin-polarized calculation: set "ISPIN=2" if it is; otherwise "ISPIN=1".
-#                                - ATOMS= indice: List the atom indice as in the POSCAR. The indice are separated by a comma.
+#                                - ATOMS= indice (i.e. 1,4,102,205): List the atom indice as in the POSCAR.
+#                                         The indice are ONLY separated by a comma. Whitespaces and tabs are not allowed.
 #                                - MAX_INDEX=len(atom_index) : The maximum atom index
-#                                - FILENAME= e.g setting_file: Give a filename which you want to store the calculated total DOS
+#                                - FILENAME= e.g setting_file: Give a filename which you want to store the calculated total DOS or
+#                                                              the combined partial DOS. --->This filename will be formated into lower cases.
+#                                - SUMMATION=TRUE | FALSE: If TRUE, sum partial DOS over orbitals and write the total DOS into FILENAME;
+#                                                          If FALSE, no summation
 #                 ***The three paramters should be separted by whitespaces or tabs
-#                 ***There shold not be any whitespace or tabs between parameter names and =, as well as between = and your given values
-#
-#             command: python + the name of this script + the setting file (e.g. setting_file)
-#
+#                 ***The parameters could be in either the lower case or the upper case
 #
 #          >>>Note that the first and the last lines of the split DOS file for each are the separator which separates the partial DOS of each atom
 #              in the overall DOSCAR. Between the two lines are the real partial DOS for each atom.<<<
@@ -83,6 +88,20 @@ class DOS(object):
         for i, j in zip(self.DOS, other.DOS):
             combined_DOS.append([i[0]] + list([m + n for m, n in zip(i[1:], j[1:])]))
         return DOS(combined_DOS)
+
+    def subtract_DOS(self, other):
+
+        """
+        subtract the DOS from another DOS that must have the same data structure and format.
+        """
+
+        assert isinstance(other, self.__class__), "Cannot combine the two DOS files of different formats"
+        if len(self.DOS) != len(other.DOS) or len(self.DOS[0]) != len(other.DOS[0]):
+            print("Cannot combine <--- The two DOS files have different data structures.")
+        subtracted_DOS = [ ]
+        for i, j in zip(self.DOS, other.DOS):
+            subtracted_DOS.append([i[0]] + list([m - n for m, n in zip(i[1:], j[1:])]))
+        return DOS(subtracted_DOS)
 
     def cal_total_DOS(self):
 
@@ -148,30 +167,82 @@ def parse_setting_file(filename):
 
     setting = [ ]
     f = open(filename)
-    for line in f:
-        ispin = re.search("ISPIN=([1-2])", line)
-        atom_indice = re.search("ATOMS=([0-9\,]+)", line)
-        max_index = re.search("MAX_INDEX=(\d+)", line)
-        file_name = re.search("FILENAME=([a-zA-Z0-9\_]+)", line)
-        if not (ispin and atom_indice and file_name and max_index):
-            raise Exception, "Yours setting is not proper. Please check!"
-        else:
-            ispin = ispin.group(1)
-            atom_indice = atom_indice.group(1)
-            max_index= int(max_index.group(1))
-            file_name = file_name.group(1)
+    for ind, line in enumerate(f):
 
-        atom_indice = re.findall("\d+", atom_indice)
-        if atom_indice:
-            atom_indice = [int(index) for index in atom_indice]
-            for index in atom_indice:
-                assert index < max_index, "The given atom indice should be less than or equal to the maximum atom index"
+        params = {
+            "ispin": {
+                "reg_exp":re.compile("ispin\s*=\s*([1-2])"),
+            },
+            "atoms": {
+                "reg_exp": re.compile(r"atoms\s*=\s*([0-9\,]+)"),
+            },
+            "max_index": {
+                "reg_exp": re.compile("max_index\s*=\s*(\d+)"),
+            },
+            "file_name": {
+                "reg_exp": re.compile("filename\s*=\s*([a-zA-Z0-9\_]+)"),
+            },
+            "summation": {
+                "reg_exp": re.compile("summation\s*=\s*([a-z]+)"),
+            }
+        }
+
+        if not line.strip():
+            continue
+        line = line.lower()
+        correct_set = True
+        for key, value in params.items():
+            m = value["reg_exp"].search(line)
+            if m:
+                params[key]["value"] = m.group(1)
+            else:
+                correct_set = False
+                print("[Error]: The job setting in line %d is not correct! Skip the job\n\tline %d: %r" % (ind, ind, line))
+                break
+        if not correct_set:
+            continue
+
+        m = generate_dos_filename([ind, line], params["atoms"]["value"], params["max_index"]["value"])
+        if not m:
+            continue
         else:
-            raise Exception, "Yours setting is not proper. Please check!"
-        string_format = "DOS%0" + str(len(str(max_index))) + "d"
-        dos_filenames = [string_format % index for index in atom_indice]
-        setting.append([ispin, dos_filenames, file_name])
+            params["dos_filenames"] = {"value": m}
+
+
+        setting.append(dict([(key, params[key]["value"]) for key in params]))
     return setting
+
+def generate_dos_filename(line_info, atoms, max_index, *argvs, **kargvs):
+
+    """
+    atom_indice is a string containing the atom indice that you want to process.
+    This function generate dos filenames in the form of 'DOS + index', i.e. DOS013 if
+    max_index = 3
+    """
+
+    line_index = line_info[0]
+    line = line_info[1]
+
+    atoms = re.findall("\d+", atoms)
+    if atoms:
+        if len(atoms) <= 1:
+            print("[Error]: <line %d> The number of atoms specified using ATOMS should be more than one!\n\tline %d: %r" % (line_index, line_index, line))
+            return [ ]
+        atoms = [int(index) for index in atoms]
+        for index in atoms:
+            if index > int(max_index):
+                print("[Error]: <line %d> The atom indice in ATOMS should be less than or equal to MAX_INDEX! Skip the job.\n\tline %d: %r" % (line_index, line_index, line))
+                continue
+    else:
+        print("[Error]: <line %d> AMTOMS is not set correctly! Skip this job.\n\tline %d: %r" % (line_index, line_index, line))
+        return [ ]
+    string_format = "DOS%0" + str(len(max_index)) + "d"
+    return [string_format % index for index in atoms]
+
+def no_action(line_info, value, *argvs, **kargvs):
+    return value
+
+
 
 def test():
     """This is a testing"""
@@ -191,14 +262,15 @@ def test():
 
 if __name__ == '__main__':
     for setting in parse_setting_file(sys.argv[1]):
-        dos = DOS(read(setting[1][0]))
-        for file_name in setting[1][1:]:
+        dos = DOS(read(setting["dos_filenames"][0]))
+        for file_name in setting["dos_filenames"][1:]:
             dos = dos + DOS(read(file_name))
-        if setting[0] == '2':
-            dos = dos.cal_spin_polarized_DOS()
-        if setting[0] == '1':
-            dos = dos.cal_total_DOS()
-        dos.write(setting[-1])
+        if setting["summation"] ==  "true":
+            if setting["ispin"] == '2':
+                dos = dos.cal_spin_polarized_DOS()
+            if setting["ispin"] == '1':
+                dos = dos.cal_total_DOS()
+        dos.write(setting["file_name"])
 
 
 ########################################################################################################################################
