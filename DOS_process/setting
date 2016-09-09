@@ -1,0 +1,14 @@
+ISPIN =     1   ATOMS=1,3   MAX_INDEX=330   FILENAME=1_3_DOS SUM  =       True
+ISPIN=2   ATOMS=1,23,56 MAX_INDEX   = 330 FILENAME=1_23_56  Sum = False
+
+ATOMS = 1,9 MAX_INDEX=100 
+
+atoms = 2,100,300  MAX_INDEX=330 sum_dos = tue  operation = sb  fermi_energy=1.123e-12
+atoms = 2,100,300  MAX_INDEX = 500  sum_dos = flse operation = cm  fermi_energy = +1.234
+atoms = 2,100,300 
+
+asdfa
+     
+                
+
+ISPIN = 1 ATOMS=4  MAX_INDEX=10 FILENAME=4_ONLY SUMMATION = true

@@ -1,0 +1,62 @@
+ Author: Computational Material Physics (Feng & Zhang)
+ Website: https://2dmaterials.nus.edu.sg/feng/
+ Email: e0001020@u.nus.edu
+
+Brief Description: The scripts, i.e. SplitDos.sh, Process_Partial_Dos.py, Read_File.py and main.py can
+                   coded to facilitate the post-process of the partial DOS calculation using VASP:
+
+                        1. SplitDos.sh can split a DOSCAR into a series of sub-DOS files for each atom with
+                           filenames 'DOS + the atom index in the POSCAR', i.e. DOS001, DOS101, ... And the
+                           the size of the atom index shown in the filename is equal to that of the number of
+                           atoms in the DOSCAR
+                           >>>Note that the first and the last lines of the split DOS file for each are
+                              the separator which separates the partial DOS of each atom in the overall DOSCAR.
+                              Between the two lines are the real partial DOS for each atom.<<<
+                        2. Process_Partial_Dos.py with another bash script named SplitDos.sh is coded for the
+                           post-process of a partial DOS calculation using VASP when the manipulation (i.e.
+                           ***DOS combination or subtraction,
+                           ***total (spin-polarized) DOS calculation,
+                           ***fermi energy correction)
+                           of the (spin-polarized) DOSs of specific atoms in a crystal system is required.
+                        3. Read_File.py can read partial DOS files that derive from SplitDos.sh and format the
+                           DOS which can be used the input DOS data of class 'DOS' in Process_Partial_Dos.py.
+                           On the other hand, it can extract certain params bellow from a setting, which defines
+                           the DOS manipulations. You can look at Process_Partial_Dos.py or main.py to figure out
+                           the function of this script.
+                        4. main.py is the main script coded in Python. This script imports Process_Partial_Dos.py
+                           and Read_File.py as modules and processes DOS according to the DOS manipulation specified
+                           in a setting file, say setting.
+
+How to use:
+          step 1. Use SplitDos.sh to split a DOSCAR into a series of sub-DOS files for each atom with
+                  filenames 'DOS + the atom index in the POSCAR', i.e. DOS001, DOS101, ...
+                  command: >>>. SplitDos.sh
+
+          step 2. In order to provide what DOS manipulations are supposed to be made, you need to provide a setting file,
+                  say named 'setting'. In this file, each line is a individual job. The partial DOS manipulations of the
+                  specified atoms will be implemented and written into a file as per parameters bellow.
+                  Parameters required:
+                                - ISPIN=1 | 2: (optional, default: 1)
+                                             whether it is a spin-polarized calculation: set "ISPIN=2" if it is; otherwise "ISPIN=1".
+                                - ATOMS= indice (i.e. 1,4,102,205): (Must be set)
+                                             List the atom indice as in the POSCAR.
+                                             The indice are ONLY separated by a comma. Whitespaces and tabs are not allowed.
+                                - MAX_INDEX=len(atom_index) : (Must be set)
+                                             The maximum atom index
+                                - OPERATION=COM | SUB: (optional, default: COM)
+                                                              If COM, DOS combination calculation is made ;
+                                                              If SUB, DOS subtraction calculation is made;
+                                - SUM_DOS= TRUE | FALSE: (optional, default: FALSE)
+                                                              If TRUE and ISPIN=2, the total spin polarized DOSs are calculated:
+                                                                      1st col, 2nd col, 3rd col: energy, spin up DOS, spin down DOS
+                                                              If TRUE, the total DOS is calculated: 1st col, 2nd col: energy, total DOS
+                                                              If FALSE, no action
+                                - FERMI_ENERGY: (optional, default: 0)
+                                                              Reset energy with respect to FERMI_ENERGY
+                                - FILENAME= e.g setting_file: (optional, default: output_dos)
+                                             Give a filename which you want to store the calculated DOS
+                                             AFTER ALL DOS MANIPULATIONS. --->This filename will be formated into lower cases.
+                  ***The three paramters should be separted by whitespaces or tabs
+                  ***The parameters could be in either the lower case or the upper case
+                  command: >>>python main.py setting (> log)
+
