@@ -1,4 +1,8 @@
 #!/bin/bash
+# Author: Computational Material Physics (Feng & Zhang)
+# Website: https://2dmaterials.nus.edu.sg/feng/
+# Email: e0001020@u.nus.edu
+
 
 #Application:
 #           This script splits the overall DOSCAR into a set of sub-DOS files for each atom in the crystal
