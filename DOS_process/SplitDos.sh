@@ -10,8 +10,9 @@
 #          . SplitDos.sh
 
 
-sep=$(cat test_DOSCAR | sed -n '6p')   # the 6th line is the separator line which separates the partial DOS of each atom from each other
-sep_lines=$(nl -n "ln" test_DOSCAR | grep "$sep" | cut -d " " -f 1) #get the line indice of the separator
+read -p "Enter the DOSCAR filename ('DOSCAR' if no change): " DOSCAR
+sep=$(cat $DOSCAR | sed -n '6p')   # the 6th line is the separator line which separates the partial DOS of each atom from each other
+sep_lines=$(nl -n "ln" $DOSCAR | grep "$sep" | cut -d " " -f 1) #get the line indice of the separator
 i=0
 
 for ind in $sep_lines #This loop assign the line indice obtained abobe to an array named sep_indice
@@ -19,18 +20,18 @@ do
     sep_indice[$i]=$ind
     ((i++))
 done
-sep_indice[$i]=$(wc -l test_DOSCAR | cut -d " " -f 1) #append the line index of the last line of the DOSCAR to sep_indice
+sep_indice[$i]=$(wc -l $DOSCAR | cut -d " " -f 1) #append the line index of the last line of the DOSCAR to sep_indice
 i_max=$(($i-1)) 
 
 
 for ((i=0; i<i_max; i++))
 do
     filename=DOS$(printf "%0${#i_max}d" $i) #format filenames
-    cat test_DOSCAR | sed -n "${sep_indice[$i]},${sep_indice[$(($i+1))]}p" >> $filename
+    cat $DOSCAR | sed -n "${sep_indice[$i]},${sep_indice[$(($i+1))]}p" >> $filename
 done
 filename=DOS$(printf "%0${#i_max}d" $i)
 cat >$filename <<!
-$(cat test_DOSCAR | sed -n "${sep_indice[$i]},${sep_indice[$(($i+1))]}p")
+$(cat $DOSCAR | sed -n "${sep_indice[$i]},${sep_indice[$(($i+1))]}p")
 $sep
 !
 
