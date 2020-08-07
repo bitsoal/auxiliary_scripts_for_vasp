@@ -10,7 +10,7 @@ import os, re, math
 #%matplotlib inline
 
 
-# In[4]:
+# In[2]:
 
 
 class PROCAR():
@@ -44,7 +44,7 @@ class PROCAR():
                     cal_summary_dict["lorbit"] = int(line.split()[2])
                 elif line.startswith("LSORBIT"):
                     cal_summary_dict["lsorbit"] = True if "t" in line.split()[2].lower() else False
-                elif "NBANDS" in line:
+                elif "NBANDS" in line and "number of bands" in line:
                     cal_summary_dict["nbands"] = int(line.split("NBANDS=")[-1].strip())
                     cal_summary_dict["nkpoints"] = int(line.split("k-points in BZ")[0].split("=")[1].strip())
                 elif "NIONS" in line:
@@ -87,6 +87,16 @@ class PROCAR():
         
         #Convert k-points to a scalar k-path
         cal_summary_dict["scalar_kpath"] = PROCAR.cal_scalar_kpath_from_kpoint_vectors(kpoint_vectors=kpoint_vectors, rec_latt_vectors=rec_latt_vectors)
+        
+        avaiable_orbitals = []
+        with open(os.path.join(cal_loc, "PROCAR"), "r") as procar_f:
+            for line in procar_f:
+                if line.startswith("ion"):
+                    avaiable_orbitals = line.strip().split()[1:]
+                    break
+        cal_summary_dict["available_orbitals"] = avaiable_orbitals
+        print("Projection on the following orbitals of each atom is available by parsing PROCAR: \n" + "\t".join(avaiable_orbitals))
+        
         return cal_summary_dict
         
         
@@ -128,7 +138,9 @@ class PROCAR():
         target_projections_filename = os.path.join(self.cal_loc, "target_projections")
         if not os.path.isfile(target_projections_filename):
             print("\n" + self.read_target_projections.__doc__ + "\n")
-            open(target_projections_filename, "w").close()
+            with open(target_projections_filename, "w") as target_projection_f:
+                target_projection_f.write("#Projection on the following orbitals of each atom is available by parsing PROCAR:\n")
+                target_projection_f.write("#"+"\t".join(self.cal_summary_dict["available_orbitals"])+"\n")
             raise Exception("Cannot find file 'target_projections' defining the target projections. We create an empty 'target_projections' for you .Please follow the format guidelines above and define your target projections in it")
             
         target_projections_str = []
@@ -443,7 +455,7 @@ class PROCAR():
         return sub_block_dict
 
 
-# In[5]:
+# In[3]:
 
 
 if __name__ == "__main__":
