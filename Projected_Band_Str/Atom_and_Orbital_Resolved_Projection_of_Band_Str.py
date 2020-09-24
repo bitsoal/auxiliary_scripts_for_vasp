@@ -60,7 +60,7 @@ class PROCAR():
                     break
             direct_latt_vectors, rec_latt_vectors = [], []
             for i in range(3):
-                latt_vec = next(outcar_f).split()
+                latt_vec = next(outcar_f).replace("-", " -").split()
                 direct_latt_vectors.append([float(dir_) for dir_ in latt_vec[:3]])
                 rec_latt_vectors.append([float(rec_) * 2 * math.pi for rec_ in latt_vec[-3:]])
             cal_summary_dict["rec_latt_vectors"] = rec_latt_vectors
@@ -292,8 +292,8 @@ class PROCAR():
                 spin_up_projections = projections
                 spin_up_energies = energies
                 #projections and energies below essentially correspond to the spin-down channel
-                projections = [[] for i in range(self.cal_summary_dict["nkpoints"])]
-                energies = [[] for i in range(self.cal_summary_dict["nkpoints"])]
+                projections = [[] for i in range(self.cal_summary_dict["nbands"])]
+                energies = [[] for i in range(self.cal_summary_dict["nbands"])]
                 
             #set E_fermi to 0, i.e. the reference energy
             energy = bloch_state_dict["energy"] - e_fermi
