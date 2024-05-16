@@ -6,9 +6,6 @@
 
 import os, re, math
 
-#import matplotlib.pyplot as plt
-#%matplotlib inline
-
 
 # In[2]:
 
@@ -21,17 +18,21 @@ class PROCAR():
                     1. the reciprocal lattice vectors and the high symmetry k-path for scalar k-path construction
                     2. E-fermi --> It will be set to zero in the output band structure
                     3. ISPIN & LOSOBITAL
+        vasprun.xml is also needed to extract efermi which is sometimes greatly different from E-fermi in OUTCAR.
         This class should be able to process both collinear and non-collinear calculations. The former could be either non-spin-polarized or spin-polarized.
     """
     
-    def __init__(self, cal_loc='.', procar_filename="PROCAR", outcar_filename="OUTCAR"):
+    def __init__(self, cal_loc='.', procar_filename="PROCAR", outcar_filename="OUTCAR", poscar_filename="POSCAR", vasprun_filename="vasprun.xml"):
         self.cal_loc = cal_loc
         self.procar_filename = procar_filename
         self.outcar_filename = outcar_filename
-        self.cal_summary_dict = PROCAR.obtain_cal_summary_from_outcar(cal_loc=cal_loc, outcar_filename=outcar_filename)
+        self.poscar_filename = poscar_filename
+        self.vasprun_filename = vasprun_filename
+        self.species = self.read_species_from_poscar()
+        self.cal_summary_dict = PROCAR.obtain_cal_summary_from_outcar(cal_loc=cal_loc, outcar_filename=outcar_filename, vasprun_filename=vasprun_filename)
         
     @classmethod
-    def obtain_cal_summary_from_outcar(cls, cal_loc=".", outcar_filename="OUTCAR"):
+    def obtain_cal_summary_from_outcar(cls, cal_loc=".", outcar_filename="OUTCAR", vasprun_filename="vasprun.xml"):
         outcar_filename = os.path.join(cal_loc, outcar_filename)
         
         cal_summary_dict = {}
@@ -51,6 +52,11 @@ class PROCAR():
                     cal_summary_dict["nions"] = int(line.split("NIONS =")[-1].strip())
                 elif line.startswith("E-fermi"):
                     cal_summary_dict["e_fermi"] = float(line.split()[2])
+        with open(os.path.join(cal_loc, vasprun_filename), "r") as vasprun_f:
+            for line in vasprun_f:
+                if '<i name="efermi">' in line:
+                    cal_summary_dict["e_fermi_in_vasprun.xml"] = float(line.split(">")[1].split("<")[0].strip())
+                    break
                 
         
         with open(outcar_filename, "r") as outcar_f:
@@ -70,7 +76,7 @@ class PROCAR():
             #Retieve k-point lines
             for line in outcar_f:
                 line = line.strip()
-                if line.startswith("k-point  1 :") and "plane waves:" in line:
+                if (line.startswith("k-point  1 :") or line.startswith("k-point   1 :")) and "plane waves:" in line:
                     break
             kpoint_lines = [line]
             for i in range(cal_summary_dict["nkpoints"]-1):
@@ -100,7 +106,6 @@ class PROCAR():
         return cal_summary_dict
         
         
-        
     @classmethod
     def cal_scalar_kpath_from_kpoint_vectors(cls, kpoint_vectors, rec_latt_vectors):
         kpath = [0]
@@ -113,6 +118,19 @@ class PROCAR():
             dkpath = pow(sum([dk_ij * dk_ij for dk_ij in cartesian_diff_kpoint_vec]), 0.5)
             kpath.append(dkpath+kpath[-1])
         return kpath
+    
+    def read_species_from_poscar(self):
+        assert os.path.isfile(os.path.join(self.cal_loc, self.poscar_filename)), "{} does not exist under {}".format(self.poscar_filename, self.cal_loc)
+        with open(os.path.join(self.cal_loc, self.poscar_filename), "r") as f:
+            lines = list(f)
+        spec_list, atom_no_list = lines[5].strip().split(), lines[6].strip().split()
+        species = []
+        for spec, atom_no in zip(spec_list, atom_no_list):
+            species.extend([spec]*int(atom_no))
+        print("#Parsed line 6 from {}: {}".format(self.poscar_filename, spec_list))
+        print("#Parsed line 7 from {}: {}".format(self.poscar_filename, atom_no_list))
+        print("#Generated species of length {}: {}".format(len(species), species))
+        return tuple(species)
     
     def read_target_projections(self):
         """
@@ -171,7 +189,10 @@ class PROCAR():
                             start_ion_ind, end_ion_end = [int(ion_ind) for ion_ind in ion_.split("-")]
                             ion_ind_list.extend(range(start_ion_ind, end_ion_end+1))
                         else:
-                            ion_ind_list.append(ion_)
+                            if ion_ in self.species:
+                                ion_ind_list.extend([str(ind + 1) for ind, spec in enumerate(self.species) if spec == ion_])
+                            else:
+                                ion_ind_list.append(ion_)
                     target_proj.extend([str(ion_ind) + "-" + orbital for ion_ind in ion_ind_list for orbital in orbital_part.split(",")])
                 except:
                     print("\nFail to parse the target projection below")
@@ -208,6 +229,8 @@ class PROCAR():
         for spin_ind in range(len(energies)):
             with open(output_filename_list[spin_ind], "w") as output_f:
                 #Write header
+                output_f.write("#(E-fermi in OUTCAR) - (efermi in vasprun.xml) = {} - {}\n".format(self.cal_summary_dict["e_fermi"], self.cal_summary_dict["e_fermi_in_vasprun.xml"]))
+                output_f.write("#Note that the eigenvalues below are relative to (E-fermi in OUTCAR)\n")
                 title_line = "#1_based_band_ind\t1_based_k_ind\tscalar_k_path\tenergy\t"
                 for short_name, projection_detail in zip(short_projection_names, projection_details):
                     output_f.write("#%s: %s\n" % (short_name, projection_detail))
@@ -455,7 +478,7 @@ class PROCAR():
         return sub_block_dict
 
 
-# In[3]:
+# In[ ]:
 
 
 if __name__ == "__main__":
@@ -465,35 +488,3 @@ if __name__ == "__main__":
     energies, projections, projection_details = procar.get_projections_on_atom_and_orbital(target_projections)
     procar.write_projected_band_str(energies, projections, projection_details, short_projection_names)
 
-
-# plt.figure(figsize=(16, 8))
-# scalar_kpath = procar.cal_summary_dict["scalar_kpath"]
-# plt.subplot(1, 2, 1)
-# for band_ind in range(procar.cal_summary_dict["nbands"]):
-#     plt.plot(scalar_kpath, energies[0][band_ind], color="gray")
-#     plt.scatter(scalar_kpath, energies[0][band_ind], s=[proj[4]*100 for proj in projections[0][band_ind]], color="red")
-# plt.ylim([-5, 5])
-# plt.xlim([0, max(scalar_kpath)])    
-# 
-# plt.subplot(1, 2, 2)
-# for band_ind in range(procar.cal_summary_dict["nbands"]):
-#     plt.plot(scalar_kpath, energies[0][band_ind], color="gray")
-#     plt.scatter(scalar_kpath, energies[0][band_ind], s=[abs(proj[5])*100 for proj in projections[0][band_ind]], color="orange")
-# plt.ylim([-5, 5])
-# plt.xlim([0, max(scalar_kpath)])
-# projection_names
-
-# band_ind = 55
-# plt.figure(figsize=[16, 6])
-# plt.subplot(1, 2, 1)
-# plt.plot(scalar_kpath, [proj[0] for proj in projections[0][band_ind]], color="blue", label="Ag 1 4")
-# plt.plot(scalar_kpath, [proj[1] for proj in projections[0][band_ind]], color="red", label="Ag 2 3")
-# plt.plot(scalar_kpath, [proj[2] for proj in projections[0][band_ind]], color="orange", label="S")
-# plt.scatter([scalar_kpath[81], scalar_kpath[161]], [0.3, 0.3])
-# plt.xlim([min(scalar_kpath), max(scalar_kpath)])
-# plt.legend()
-# 
-# plt.subplot(1, 2, 2)
-# plt.plot(scalar_kpath, [sum(proj) for proj in projections[0][band_ind]], color="black", label="tot")
-# plt.scatter([scalar_kpath[81], scalar_kpath[161]], [0.8, 0.8])
-# plt.xlim([min(scalar_kpath), max(scalar_kpath)])
