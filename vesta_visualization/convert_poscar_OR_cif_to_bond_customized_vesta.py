@@ -71,7 +71,7 @@ def read_customization(customization_filename):
             temp_list[-1] = tuple((tol for tol in temp_list[-1].split(",")))
             for filename in temp_list[:-1]:
                 full_filename = os.path.join(structure_folder, filename)
-                #assert os.path.isfile(full_filename), "{} does not exist".format(full_filename)
+                assert os.path.isfile(full_filename), "{} does not exist".format(full_filename)
             customizations.append(tuple(temp_list))
     return customizations
 
@@ -138,13 +138,13 @@ CELLP
     vesta_formated_list.append("SBOND")
     bond_count = 1
     sorted_spec_list = sorted(set(species_list))
-    for spec_1_ind, spec_1 in enumerate(sorted_spec_list[:-1]):
-        for spec_2 in sorted_spec_list[spec_1_ind+1:]:
+    for spec_1_ind, spec_1 in enumerate(sorted_spec_list):
+        for spec_2 in sorted_spec_list[spec_1_ind:]:
             customized_bond_tol = (1 + bond_tol + bond_tol_shift) * (atomic_radius[spec_1] + atomic_radius[spec_2])
             vesta_formated_list.append("  {}    {}    {}    0.00000    {:.6f}  0  1  1  0  1  0.250  2.000 127 127 127".format(bond_count, spec_1, spec_2, 
                                                                                                                                customized_bond_tol))
             bond_count += 1
-            if is_reversed_sbond_included:
+            if is_reversed_sbond_included and spec_1 != spec_2:
                 vesta_formated_list.append("  {}    {}    {}    0.00000    {:.6f}  0  1  1  0  1  0.250  2.000 127 127 127".format(bond_count, spec_2, spec_1, 
                                                                                                                                    customized_bond_tol))
                 bond_count += 1
@@ -159,8 +159,8 @@ CELLP
 
 if __name__ == "__main__":
     #Refer to the documentation of functional read_customization for the format of customization_filename
-    customization_filename="all_to_unique_molecule_mapping.dat"
-    structure_folder = "opt_str"
+    customization_filename="input_data/test_customization.dat"
+    structure_folder = "input_data/"
     customized_vesta_file_loc="customized_vesta_files"
     bond_tol_shift = 1.0e-5
     
@@ -172,8 +172,7 @@ if __name__ == "__main__":
     
     customization_details = read_customization(customization_filename=customization_filename)
     for cust_detail in customization_details:
-        #for str_filename in cust_detail[:-1]:
-        for str_filename in cust_detail[0:1]:
+        for str_filename in cust_detail[:-1]:
             if str_filename.endswith(".cif"):
                 vesta_filename_prefix = str_filename.replace(".cif", "")
             elif str_filename.endswith(".vasp"):
